@@ -30,3 +30,8 @@ $> crmux
 
 Now you can attach more then one devtools client on port 9223 ( browse to `http://localhost:9223/` to see list of inspectable tabs )
 
+## See also
+
+  - [crconsole](https://github.com/sidorares/crconsole) - console developer tools client and REPL.
+  - [chrome-remote-interface](https://github.com/cyrus-and/chrome-remote-interface) - node.js client library for [Chrome DevTools Remote Debugging Protocol](https://developers.google.com/chrome-developer-tools/docs/protocol/1.0/), also features simple REPL.
+
