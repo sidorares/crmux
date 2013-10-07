@@ -1,0 +1,14 @@
+{
+  "name": "crmux",
+  "version": "0.0.1",
+  "description": "chrome developer tools remote protocol multiplexer",
+  "author": "Andrey Sidorov <sidorares@yandex.ru>",
+  "bin": {
+    "crmux": "./crmux.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ws": "~0.4.31",
+    "commander": "~2.0.0"
+  }
+}
