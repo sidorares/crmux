@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 
 var http = require('http');
-var MULTIPLEX_PORT = 9223;
-var DEVTOOLS_PORT = 9222;
-var WS_PORT = MULTIPLEX_PORT + 1;
 var bl = require('bl');
 var url = require('url');
 var WebSocket = require('ws');
@@ -11,11 +8,66 @@ var WebSocket = require('ws');
 var colors = require('colors');
 var program = require('commander');
 
+program
+  .version('0.0.1')
+  .option('-p, --port <port>', 'developer tools port [9222]', Number, 9222)
+  .option('-l, --listen <port>', 'listen port [9223]', Number, 9223)
+  .option('-d, --debug', 'show requests and responses')
+  .parse(process.argv);
+
 var lastId = 0;
 var requestId = 0;
 var upstreamMap = {};
 
-var wss = new WebSocket.Server({port: WS_PORT});
+
+
+var cachedWsUrls = {};
+
+var server = http.createServer(function(req, res) {
+  if (req.url == '/json') {
+    upReq = http.request({
+      port: program.port,
+      path: req.url
+    }, function(upRes) {
+      upRes.pipe(bl(function(err, data) {
+        var tabs = JSON.parse(data.toString());
+        var wsUrl, urlParsed, feUrlParsed;
+        for (var i=0; i < tabs.length; ++i)
+        {
+          wsUrl = tabs[i].webSocketDebuggerUrl;
+
+          if (typeof wsUrl == 'undefined') {
+             wsUrl = cachedWsUrls[tabs[i].thumbnailUrl];
+          } 
+          if (typeof wsUrl == 'undefined')
+             continue;
+
+          urlParsed = url.parse(wsUrl, true);
+          urlParsed.port = program.listen;
+          delete urlParsed.host;
+          tabs[i].webSocketDebuggerUrl = url.format(urlParsed);
+          if (tabs[i].devtoolsFrontendUrl)
+            tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
+          // console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
+          // TODO: cache devtoolsFrontendUrl as well
+          cachedWsUrls[tabs[i].thumbnailUrl] = wsUrl;
+        }
+        res.end(JSON.stringify(tabs));
+      }));
+    }).end();
+  } else {
+    var options = {};
+    options.port = program.port;
+    options.path = req.url;
+    http.request(options, function(upRes) {
+      upRes.pipe(res);
+    }).end();
+  }
+});
+
+server.listen(program.listen);
+
+var wss = new WebSocket.Server({server: server});
 wss.on('connection', function(ws) {
     ws._id = lastId++;
     
@@ -23,7 +75,7 @@ wss.on('connection', function(ws) {
     urlParsed.protocol = 'ws:';
     urlParsed.slashes = '//';
     urlParsed.hostname = 'localhost';
-    var wsUpstreamUrlPort = DEVTOOLS_PORT; //9222; //urlParsed.query._crmuxOrigPort;
+    var wsUpstreamUrlPort = program.port;
     urlParsed.port = wsUpstreamUrlPort;
     delete urlParsed.query;
     delete urlParsed.search;
@@ -42,15 +94,18 @@ wss.on('connection', function(ws) {
          var msgObj = JSON.parse(message);
          if (!msgObj.id) { // this is an event, broadcast it
            upstreamMap[wsUpstreamUrl].clients.forEach(function(s) {
-             console.log('e> ' + message.cyan);
+             if (program.debug)
+               console.log('e> ' + message.cyan);
              s.send(message);
            });
          } else {
            var idMap = upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
            msgObj.id = idMap.id;
            idMap.client.send(JSON.stringify(msgObj));
-           console.log(String(idMap.client._id).blue + "> " + idMap.message.yellow);
-           console.log(String(idMap.client._id).blue + "> " + JSON.stringify(msgObj).green);
+           if (program.debug) {
+             console.log(String(idMap.client._id).blue + "> " + idMap.message.yellow);
+             console.log(String(idMap.client._id).blue + "> " + JSON.stringify(msgObj).green);
+           }  
            delete upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
          }
       });
@@ -63,8 +118,6 @@ wss.on('connection', function(ws) {
     ws._upstream.params = upstreamMap[wsUpstreamUrl];
 
     ws.on('message', function(message) {
-        // console.log('received: %s', message);
-        //console.log(message);
         var upstream = ws._upstream;
         
         var msgObj;
@@ -83,11 +136,8 @@ wss.on('connection', function(ws) {
           id: remote,
           message: message
         };
-        //console.log(upstream.params.localIdToRemote);
-        //console.log('sending as: %s', JSON.stringify(msgObj));
         if (upstream.readyState == 0) {
           upstream.once('open', function() {
-            console.log('OPENED!', upstream.readyState);
             upstream.send(JSON.stringify(msgObj));
           });
         } else
@@ -105,60 +155,3 @@ wss.on('connection', function(ws) {
        upstreamMap[wsUpstreamUrl].clients = purged;
     });
 });
-
-var cachedWsUrls = {};
-
-http.createServer(function(req, res) {
-  if (req.url == '/json') {
-    upReq = http.request({
-      port: DEVTOOLS_PORT,
-      path: req.url
-    }, function(upRes) {
-      upRes.pipe(bl(function(err, data) {
-        var tabs = JSON.parse(data.toString());
-        var wsUrl, urlParsed, feUrlParsed;
-        for (var i=0; i < tabs.length; ++i)
-        {
-          wsUrl = tabs[i].webSocketDebuggerUrl;
-
-          if (typeof wsUrl == 'undefined') {
-             wsUrl = cachedWsUrls[tabs[i].thumbnailUrl];
-          } 
-          if (typeof wsUrl == 'undefined')
-             continue;
-
-          urlParsed = url.parse(wsUrl, true);
-          //urlParsed.query._crmuxOrigPort = urlParsed.port;
-          urlParsed.port = WS_PORT;
-          delete urlParsed.host;
-          tabs[i].webSocketDebuggerUrl = url.format(urlParsed);
-
-          // TODO: devtools don't undestend proper urlencoded query
-          // TODO: fill a bug
-          /*
-          feUrlParsed = url.parse(tabs[i].devtoolsFrontendUrl, true);
-          feUrlParsed.query.ws = url.format(urlParsed);
-          delete feUrlParsed.path;
-          delete feUrlParsed.href;
-          delete feUrlParsed.search;
-          tabs[i].devtoolsFrontendUrl = url.format(feUrlParsed);
-          */
-          console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
-          if (tabs[i].devtoolsFrontendUrl)
-            tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
-          console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
-          // TODO: cache devtoolsFrontendUrl as well
-          cachedWsUrls[tabs[i].thumbnailUrl] = wsUrl;
-        }
-        res.end(JSON.stringify(tabs));
-      }));
-    }).end();
-  } else {
-    var options = {};
-    options.port = DEVTOOLS_PORT;
-    options.path = req.url;
-    http.request(options, function(upRes) {
-      upRes.pipe(res);
-    }).end();
-  }
-}).listen(MULTIPLEX_PORT);
