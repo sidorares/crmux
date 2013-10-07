@@ -2,7 +2,8 @@
 
 Chrome developer tools remote protocol multiplexer.
 
-Chrome does not allow more then one developer tools connection to the a tab. Crconsole multiplex multiple incoming connections into single websocket connection and transparently matches and translates JSON-RPC request and response message IDs from single local rnge to multiple remote ranges of ID's.
+Chrome does not allow more then one developer tools connection to the a tab. Crconsole multiplex multiple incoming connections into single websocket connection and transparently matches and translates JSON-RPC request and response message IDs from single local rage to multiple remote ranges of ID'. Events are dispatched to all clients.
+
 
 ![crmux in Terminal](https://f.cloud.github.com/assets/173025/1279477/322e3122-2f38-11e3-8dfc-d9bb1b76d6e0.png)
 
