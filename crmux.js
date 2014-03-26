@@ -37,8 +37,8 @@ var server = http.createServer(function(req, res) {
           wsUrl = tabs[i].webSocketDebuggerUrl;
 
           if (typeof wsUrl == 'undefined') {
-             wsUrl = cachedWsUrls[tabs[i].thumbnailUrl];
-          } 
+             wsUrl = cachedWsUrls[tabs[i].id];
+          }
           if (typeof wsUrl == 'undefined')
              continue;
 
@@ -50,7 +50,7 @@ var server = http.createServer(function(req, res) {
             tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
           // console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
           // TODO: cache devtoolsFrontendUrl as well
-          cachedWsUrls[tabs[i].thumbnailUrl] = wsUrl;
+          cachedWsUrls[tabs[i].id] = wsUrl;
         }
         res.end(JSON.stringify(tabs));
       }));
@@ -70,7 +70,7 @@ server.listen(program.listen);
 var wss = new WebSocket.Server({server: server});
 wss.on('connection', function(ws) {
     ws._id = lastId++;
-    
+
     var urlParsed = url.parse(ws.upgradeReq.url, true);
     urlParsed.protocol = 'ws:';
     urlParsed.slashes = '//';
@@ -105,7 +105,7 @@ wss.on('connection', function(ws) {
            if (program.debug) {
              console.log(String(idMap.client._id).blue + "> " + idMap.message.yellow);
              console.log(String(idMap.client._id).blue + "> " + JSON.stringify(msgObj).green);
-           }  
+           }
            delete upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
          }
       });
@@ -119,7 +119,7 @@ wss.on('connection', function(ws) {
 
     ws.on('message', function(message) {
         var upstream = ws._upstream;
-        
+
         var msgObj;
         try {
           msgObj = JSON.parse(message);
@@ -144,7 +144,7 @@ wss.on('connection', function(ws) {
           upstream.send(JSON.stringify(msgObj));
     });
     ws.on('close', function() {
-       // TODO: 
+       // TODO:
        // var upstream = ws._upstream;
        // for each key in upstream.params.localIdToRemote
        // delete all keys where ws._id = key.client._id
