@@ -9,7 +9,7 @@ var colors = require('colors');
 var program = require('commander');
 
 program
-  .version('0.0.1')
+  .version(require('./package.json').version)
   .option('-p, --port <port>', 'developer tools port [9222]', Number, 9222)
   .option('-l, --listen <port>', 'listen port [9223]', Number, 9223)
   .option('-d, --debug', 'show requests and responses')
