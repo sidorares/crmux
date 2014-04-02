@@ -16,45 +16,48 @@ program
   .parse(process.argv);
 
 var lastId = 0;
-var requestId = 0;
 var upstreamMap = {};
 
 
 
 var cachedWsUrls = {};
 
+var cacheJson = function(res) {
+  return http.request({
+    port: program.port,
+    path: '/json'
+  }, function(upRes) {
+    upRes.pipe(bl(function(err, data) {
+      var tabs = JSON.parse(data.toString());
+      var wsUrl, urlParsed;
+      for (var i = 0; i < tabs.length; ++i) {
+        wsUrl = tabs[i].webSocketDebuggerUrl;
+
+        if (typeof wsUrl == 'undefined') {
+          wsUrl = cachedWsUrls[tabs[i].id];
+        }
+        if (typeof wsUrl == 'undefined')
+          continue;
+
+        urlParsed = url.parse(wsUrl, true);
+        urlParsed.port = program.listen;
+        delete urlParsed.host;
+        tabs[i].webSocketDebuggerUrl = url.format(urlParsed);
+        if (tabs[i].devtoolsFrontendUrl)
+          tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
+        // console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
+        // TODO: cache devtoolsFrontendUrl as well
+        cachedWsUrls[tabs[i].id] = wsUrl;
+      }
+      if (res) {
+        res.end(JSON.stringify(tabs));
+      }
+    }));
+  });
+}
 var server = http.createServer(function(req, res) {
   if (req.url == '/json') {
-    upReq = http.request({
-      port: program.port,
-      path: req.url
-    }, function(upRes) {
-      upRes.pipe(bl(function(err, data) {
-        var tabs = JSON.parse(data.toString());
-        var wsUrl, urlParsed, feUrlParsed;
-        for (var i=0; i < tabs.length; ++i)
-        {
-          wsUrl = tabs[i].webSocketDebuggerUrl;
-
-          if (typeof wsUrl == 'undefined') {
-             wsUrl = cachedWsUrls[tabs[i].id];
-          }
-          if (typeof wsUrl == 'undefined')
-             continue;
-
-          urlParsed = url.parse(wsUrl, true);
-          urlParsed.port = program.listen;
-          delete urlParsed.host;
-          tabs[i].webSocketDebuggerUrl = url.format(urlParsed);
-          if (tabs[i].devtoolsFrontendUrl)
-            tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
-          // console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
-          // TODO: cache devtoolsFrontendUrl as well
-          cachedWsUrls[tabs[i].id] = wsUrl;
-        }
-        res.end(JSON.stringify(tabs));
-      }));
-    }).end();
+    cacheJson(res).end();
   } else {
     var options = {};
     options.port = program.port;
@@ -69,6 +72,15 @@ server.listen(program.listen);
 
 var wss = new WebSocket.Server({server: server});
 wss.on('connection', function(ws) {
+    var jsonReq = cacheJson();
+    jsonReq.end();
+
+    jsonReq.on('close', function() {
+      if (program.debug) {
+        console.log('cachedWsUrls:', cachedWsUrls);
+      }
+    });
+
     ws._id = lastId++;
 
     var urlParsed = url.parse(ws.upgradeReq.url, true);
