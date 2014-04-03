@@ -1,6 +1,6 @@
 {
   "name": "crmux",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "chrome developer tools remote protocol multiplexer",
   "author": "Andrey Sidorov <sidorares@yandex.ru>",
   "bin": {
