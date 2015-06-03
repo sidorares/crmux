@@ -112,13 +112,13 @@ wss.on('connection', function(ws) {
            });
          } else {
            var idMap = upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
+           delete upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
            msgObj.id = idMap.id;
            idMap.client.send(JSON.stringify(msgObj));
            if (program.debug) {
              console.log(String(idMap.client._id).blue + "> " + idMap.message.yellow);
              console.log(String(idMap.client._id).blue + "> " + JSON.stringify(msgObj).green);
            }
-           delete upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
          }
       });
     } else {
