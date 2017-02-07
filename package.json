@@ -12,7 +12,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "ws": "1.1.1",
+    "ws": "2.0.0",
     "commander": "~2.0.0",
     "bl": "~0.4.2",
     "colors": "~0.6.2"
