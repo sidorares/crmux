@@ -108,7 +108,7 @@ wss.on('connection', function(ws) {
            upstreamMap[wsUpstreamUrl].clients.forEach(function(s) {
              if (program.debug)
                console.log('e> ' + message.cyan);
-             s.send(message);
+             s.send(message, function(err) {});
            });
          } else {
            var idMap = upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
@@ -155,7 +155,8 @@ wss.on('connection', function(ws) {
         } else
           upstream.send(JSON.stringify(msgObj));
     });
-    ws.on('close', function() {
+
+    var removeFromUpstreamMap = function() {
        // TODO:
        // var upstream = ws._upstream;
        // for each key in upstream.params.localIdToRemote
@@ -165,5 +166,7 @@ wss.on('connection', function(ws) {
          function(s) { return s._id != ws._id; }
        );
        upstreamMap[wsUpstreamUrl].clients = purged;
-    });
+    };
+    ws.on('close', removeFromUpstreamMap);
+    ws.on('error', removeFromUpstreamMap);
 });
