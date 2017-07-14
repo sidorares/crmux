@@ -17,10 +17,8 @@ program
 
 var lastId = 0;
 var upstreamMap = {};
-
-
-
 var cachedWsUrls = {};
+var cachedDevFrontendUrl = {};
 
 var cacheJson = function(res) {
   return http.request({
@@ -29,14 +27,21 @@ var cacheJson = function(res) {
   }, function(upRes) {
     upRes.pipe(bl(function(err, data) {
       var tabs = JSON.parse(data.toString());
-      var wsUrl, urlParsed;
+      var wsUrl, urlParsed, feUrl;
       for (var i = 0; i < tabs.length; ++i) {
         wsUrl = tabs[i].webSocketDebuggerUrl;
-
         if (typeof wsUrl == 'undefined') {
           wsUrl = cachedWsUrls[tabs[i].id];
         }
         if (typeof wsUrl == 'undefined')
+          continue;
+
+        feUrl = tabs[i].devtoolsFrontendUrl;
+
+        if (typeof feUrl == 'undefined') {
+          feUrl = cachedDevFrontendUrl[tabs[i].id];
+        }
+        if (typeof feUrl == 'undefined')
           continue;
 
         urlParsed = url.parse(wsUrl, true);
@@ -45,9 +50,9 @@ var cacheJson = function(res) {
         tabs[i].webSocketDebuggerUrl = url.format(urlParsed);
         if (tabs[i].devtoolsFrontendUrl)
           tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
-        // console.log(tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
-        // TODO: cache devtoolsFrontendUrl as well
+        //console.log("Tabs: " + tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
         cachedWsUrls[tabs[i].id] = wsUrl;
+        cachedDevFrontendUrl[tabs[i].id] = feUrl;
       }
       if (res) {
         res.end(JSON.stringify(tabs));
@@ -63,7 +68,37 @@ var server = http.createServer(function(req, res) {
     options.port = program.port;
     options.path = req.url;
     http.request(options, function(upRes) {
-      upRes.pipe(res);
+      if(req.url == '/json/list'){
+        upRes.on('data', function(data){
+          console.log('getting data');
+          if(data){
+            //console.log(data);
+            var tabs = JSON.parse(data);
+            //console.log(tabs);
+            tabs.map((tab) => {
+              //console.log(JSON.stringify(tab))
+              //console.log(cachedWsUrls[tab.id])
+              if(cachedWsUrls[tab.id]){
+                tab.webSocketDebuggerUrl = cachedWsUrls[tab.id].replace(program.port, program.listen);
+                tab.devtoolsFrontendUrl = cachedDevFrontendUrl[tab.id].replace(program.port, program.listen);
+              } else {
+                if ( typeof tab.webSocketDebuggerUrl !== 'undefined') {
+                  tab.webSocketDebuggerUrl = tab.webSocketDebuggerUrl.replace(program.port, program.listen);
+                }
+                if ( typeof tab.devtoolsFrontendUrl !== 'undefined') {
+                  tab.devtoolsFrontendUrl = tab.devtoolsFrontendUrl.replace(program.port, program.listen);
+                }
+              }
+            });
+            res.write(JSON.stringify(tabs));
+            upRes.pipe(res);
+          } else {
+            upRes.pipe(res);
+          }
+        });
+      } else {
+        upRes.pipe(res);
+      }
     }).end();
   }
 });
