@@ -149,7 +149,11 @@ wss.on('connection', function(ws) {
            var idMap = upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
            delete upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
            msgObj.id = idMap.id;
-           idMap.client.send(JSON.stringify(msgObj));
+           try {
+             idMap.client.send(JSON.stringify(msgObj));
+           } catch (err) {
+             console.log('e>' + err)
+           }
            if (program.debug) {
              console.log(String(idMap.client._id).blue + "> " + idMap.message.yellow);
              console.log(String(idMap.client._id).blue + "> " + JSON.stringify(msgObj).green);
