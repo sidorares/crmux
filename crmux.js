@@ -20,6 +20,11 @@ var upstreamMap = {};
 var cachedWsUrls = {};
 var cachedDevFrontendUrl = {};
 
+var CONSOLE_HISTORY_SIZE = 20;
+
+var consoleMessageEvents = [];
+var scriptParsedEvents = [];
+
 var cacheJson = function(res) {
   return http.request({
     port: program.port,
@@ -138,13 +143,33 @@ wss.on('connection', function(ws) {
         localIdToRemote: {}
       };
       upstreamSocket.on('message', function(message) {
-         var msgObj = JSON.parse(message);
+        var msgObj = JSON.parse(message);
          if (!msgObj.id) { // this is an event, broadcast it
            upstreamMap[wsUpstreamUrl].clients.forEach(function(s) {
              if (program.debug)
                console.log('e> ' + message.cyan);
              s.send(message, function(err) {});
            });
+
+           switch (msgObj.method) {
+             case "Debugger.scriptParsed":
+               scriptParsedEvents.push(message);
+               break;
+
+             case "Console.messageAdded":
+             case "Runtime.consoleAPICalled":
+               consoleMessageEvents.push(message);
+
+               // Unlike script parsed events, console messages
+               // don't represent critical state needed for clients
+               // to function properly, and therefore, to prevent
+               // unneccessary memory consumption, we maintain a smal
+               //  history window by pruning older log messages as needed.
+               if (consoleMessageEvents.length > CONSOLE_HISTORY_SIZE) {
+                 consoleMessageEvents.shift();
+               }
+               break;
+           }
          } else {
            var idMap = upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
            delete upstreamMap[wsUpstreamUrl].localIdToRemote[msgObj.id];
@@ -208,4 +233,12 @@ wss.on('connection', function(ws) {
     };
     ws.on('close', removeFromUpstreamMap);
     ws.on('error', removeFromUpstreamMap);
+
+    // In order to fully initialize the new debugger client's state,
+    // replay all previously occuring script parsed and console message
+    // added events, so that it can "catch up" with existing clients.
+    var replayEvents = scriptParsedEvents.concat(consoleMessageEvents);
+    replayEvents.forEach(function (message) {
+      ws.send(message);
+    });
 });
