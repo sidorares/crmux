@@ -163,8 +163,8 @@ wss.on('connection', function(ws) {
                // Unlike script parsed events, console messages
                // don't represent critical state needed for clients
                // to function properly, and therefore, to prevent
-               // unneccessary memory consumption, we maintain a smal
-               //  history window by pruning older log messages as needed.
+               // unneccessary memory consumption, we can maintain a small
+               // history window, by pruning older log messages as needed.
                if (consoleMessageEvents.length > CONSOLE_HISTORY_SIZE) {
                  consoleMessageEvents.shift();
                }
