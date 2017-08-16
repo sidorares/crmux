@@ -143,7 +143,7 @@ wss.on('connection', function(ws) {
         localIdToRemote: {}
       };
       upstreamSocket.on('message', function(message) {
-        var msgObj = JSON.parse(message);
+         var msgObj = JSON.parse(message);
          if (!msgObj.id) { // this is an event, broadcast it
            upstreamMap[wsUpstreamUrl].clients.forEach(function(s) {
              if (program.debug)
