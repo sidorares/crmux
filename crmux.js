@@ -23,6 +23,7 @@ var cachedDevFrontendUrl = {};
 var CONSOLE_HISTORY_SIZE = 20;
 
 var consoleMessageEvents = [];
+var currentPausedEvent = null;
 var scriptParsedEvents = [];
 
 var cacheJson = function(res) {
@@ -152,6 +153,14 @@ wss.on('connection', function(ws) {
            });
 
            switch (msgObj.method) {
+             case "Debugger.paused":
+               currentPausedEvent = message;
+               break;
+
+             case "Debugger.resumed":
+               currentPausedEvent = null;
+               break;
+
              case "Debugger.scriptParsed":
                scriptParsedEvents.push(message);
                break;
@@ -235,9 +244,11 @@ wss.on('connection', function(ws) {
     ws.on('error', removeFromUpstreamMap);
 
     // In order to fully initialize the new debugger client's state,
-    // replay all previously occuring script parsed and console message
-    // added events, so that it can "catch up" with existing clients.
+    // replay all previously occuring script parsed, console message
+    // added and paused, so that it can "catch up" with existing clients.
     var replayEvents = scriptParsedEvents.concat(consoleMessageEvents);
+    currentPausedEvent && replayEvents.push(currentPausedEvent);
+
     replayEvents.forEach(function (message) {
       ws.send(message);
     });
