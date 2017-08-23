@@ -30,7 +30,9 @@ function replaceHost(replaceUrl, res){
   var urlParsed = url.parse(replaceUrl, true);
   urlParsed.port = program.listen;
   delete urlParsed.host; //Host includes port. We want to use hostname
-  urlParsed.hostname = res.connection.localAddress; //Echo back the ip the client used. Supports IPv6.
+  if(res){
+    urlParsed.hostname = res.connection.localAddress; //Echo back the ip the client used. Supports IPv6.
+  }
   return url.format(urlParsed);
 }
 
