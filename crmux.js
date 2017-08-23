@@ -26,6 +26,14 @@ var consoleMessageEvents = [];
 var currentPausedEvent = null;
 var scriptParsedEvents = [];
 
+function replaceHost(replaceUrl, res){
+  var urlParsed = url.parse(replaceUrl, true);
+  urlParsed.port = program.listen;
+  delete urlParsed.host; //Host includes port. We want to use hostname
+  urlParsed.hostname = res.connection.localAddress; //Echo back the ip the client used. Supports IPv6.
+  return url.format(urlParsed);
+}
+
 var cacheJson = function(res) {
   return http.request({
     port: program.port,
@@ -33,7 +41,7 @@ var cacheJson = function(res) {
   }, function(upRes) {
     upRes.pipe(bl(function(err, data) {
       var tabs = JSON.parse(data.toString());
-      var wsUrl, urlParsed, feUrl;
+      var wsUrl, feUrl;
       for (var i = 0; i < tabs.length; ++i) {
         wsUrl = tabs[i].webSocketDebuggerUrl;
         if (typeof wsUrl == 'undefined') {
@@ -50,10 +58,7 @@ var cacheJson = function(res) {
         if (typeof feUrl == 'undefined')
           continue;
 
-        urlParsed = url.parse(wsUrl, true);
-        urlParsed.port = program.listen;
-        delete urlParsed.host;
-        tabs[i].webSocketDebuggerUrl = url.format(urlParsed);
+        tabs[i].webSocketDebuggerUrl = replaceHost(wsUrl, res);
         if (tabs[i].devtoolsFrontendUrl)
           tabs[i].devtoolsFrontendUrl = tabs[i].devtoolsFrontendUrl.replace(wsUrl.slice(5), tabs[i].webSocketDebuggerUrl.slice(5));
         //console.log("Tabs: " + tabs[i].devtoolsFrontendUrl, wsUrl, tabs[i].webSocketDebuggerUrl);
@@ -85,14 +90,14 @@ var server = http.createServer(function(req, res) {
               //console.log(JSON.stringify(tab))
               //console.log(cachedWsUrls[tab.id])
               if(cachedWsUrls[tab.id]){
-                tab.webSocketDebuggerUrl = cachedWsUrls[tab.id].replace(program.port, program.listen);
-                tab.devtoolsFrontendUrl = cachedDevFrontendUrl[tab.id].replace(program.port, program.listen);
+                tab.webSocketDebuggerUrl = replaceHost(cachedWsUrls[tab.id], res);
+                tab.devtoolsFrontendUrl = replaceHost(cachedDevFrontendUrl[tab.id], res);
               } else {
                 if ( typeof tab.webSocketDebuggerUrl !== 'undefined') {
-                  tab.webSocketDebuggerUrl = tab.webSocketDebuggerUrl.replace(program.port, program.listen);
+                  tab.webSocketDebuggerUrl = replaceHost(tab.webSocketDebuggerUrl, res);
                 }
                 if ( typeof tab.devtoolsFrontendUrl !== 'undefined') {
-                  tab.devtoolsFrontendUrl = tab.devtoolsFrontendUrl.replace(program.port, program.listen);
+                  tab.devtoolsFrontendUrl = replaceHost(tab.devtoolsFrontendUrl, res);
                 }
               }
             });
